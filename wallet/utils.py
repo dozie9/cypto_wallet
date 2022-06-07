@@ -69,6 +69,36 @@ def send_eth(from_wallet, to_wallet: str, amount):
     return w3.toHex(tx_hash)
 
 
+def decode_parameter_address(data):
+    from eth_abi import decode_abi
+
+    decodeABI = decode_abi(['address'], data)
+    return decodeABI
+
+
+def decode_parameter_amount(data):
+    from eth_abi import decode_abi
+
+    decodeABI = decode_abi(['uint256'], data)
+    return decodeABI
+
+
+def get_token_receiver_address(logs):
+    w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
+    for log in logs:
+        if w3.toHex(log['topics'][0]) == '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef':
+            # print(w3.toHex(log['topics'][2]))
+            return decode_parameter_address(log['topics'][2])[0]
+
+
+def get_token_amount(logs):
+    w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
+    for log in logs:
+        if w3.toHex(log['topics'][0]) == '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef':
+            print(log['data'])
+            return decode_parameter_amount(bytes.fromhex(log['data'][2:]))[0]
+
+
 def check_for_wallet_transaction(block):
     from wallet.models import Wallet, Transaction
     wallets = Wallet.objects.all()
@@ -77,11 +107,25 @@ def check_for_wallet_transaction(block):
     # if block and block['transactions']:
     for tx_hash in block['transactions']:
         tx = w3.eth.get_transaction(w3.toHex(tx_hash))
-        # tx_data = w3.eth.getTransactionReceipt(w3.toHex(tx_hash))
-        print(w3.eth.blockNumber - tx.blockNumber)
-        print(tx)
-        # print(tx_data['value'])
-        to_wallet_qs = wallets.filter(erc20_address__iexact=tx['to'])
+        tx_data = w3.eth.get_transaction_receipt(w3.toHex(tx_hash))
+        number_of_confirmations = w3.eth.blockNumber - tx.blockNumber
+
+        # check if to address is contract
+        if w3.eth.getCode(tx['to']) != "0x":
+            to_address = get_token_receiver_address(tx_data['logs'])
+            contract_address = tx['to']
+        else:
+            to_address = tx['to']
+
+        # print(tx)
+        # print(tx_data['logs'])
+
+        # print(get_token_amount(tx_data['logs']))
+        # for log in tx_data['logs']:
+        #     print(log['data'])
+        #     print(log['address'])
+            # print(w3.eth.decode)
+        to_wallet_qs = wallets.filter(erc20_address__iexact=to_address)
         if to_wallet_qs.exists():
             Transaction.objects.create(
                 running_balance=to_wallet_qs.first().get_balance(),
