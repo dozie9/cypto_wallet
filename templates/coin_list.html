@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h3>Select coin to transfer</h3>
+
+    {% for coin in object_list %}
+        <p><a href="{% url 'wallet:send-eth' coin.code %}">{{ coin.code }}</a></p>
+    {% endfor %}
+{% endblock %}

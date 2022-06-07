@@ -33,11 +33,14 @@ def on_message(ws, message):
         print(e)
     # print(message_dict)
 
+
 def on_error(ws, error):
     print(error)
 
+
 def on_close(ws, close_status_code, close_msg):
     print("### closed ###")
+
 
 def on_open(ws):
     print("Opened connection")

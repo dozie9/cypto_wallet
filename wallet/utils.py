@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from py_crypto_hd_wallet import HdWalletBipFactory, HdWalletSaver, HdWalletBip44Coins, HdWalletBipWordsNum, \
     HdWalletBipDataTypes
@@ -139,15 +141,18 @@ def send_erc_20_token(contract_address, abi, from_wallet, to_addr, amount):
     w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
     contract = w3.eth.contract(contract_address, abi=abi)
+    decimals = contract.functions.decimals().call()
+    DECIMALS = 10 ** decimals
+    amount_with_decimal = int(amount * DECIMALS)
 
     nonce = w3.eth.get_transaction_count(from_wallet.erc20_address)
 
     base_fee_per_gas = w3.eth.get_block('latest')['baseFeePerGas']
 
-    txn = contract.functions.transfer(to_addr, amount).build_transaction({
+    txn = contract.functions.transfer(to_addr, amount_with_decimal).buildTransaction({
         'chainId': w3.eth.chain_id,
-        'gas': 21000,
-        'maxFeePergas': base_fee_per_gas + 1,
+        'gas': 210000,
+        'maxFeePerGas': base_fee_per_gas + 1,
         'maxPriorityFeePerGas': 1,
         'nonce': nonce
     }) # .transact({'from': to_addr})

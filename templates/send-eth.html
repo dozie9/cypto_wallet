@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-    <h2>Send eth</h2>
+    <h2>Send {{ object }}</h2>
 
     {% if messages %}
         <ul class="messages">
@@ -11,7 +11,7 @@
     {% endif %}
 
     <form method="post">
-    <p>Current balance: {{ user.wallet.get_balance }} <br></p>
+    <p>Current balance: {{ balance }} <br></p>
         {% csrf_token %}
         {{ form.as_p }}
         <button>Submit</button>
