@@ -173,7 +173,7 @@ def update_transaction_status(block):
     w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
     for tx_hash in block['transactions']:
-        transactions_qs = transactions.filter(trx_hash__iexact=tx_hash)
+        transactions_qs = transactions.filter(trx_hash__iexact=tx_hash, status=Transaction.PENDING)
 
         if transactions_qs.exists():
             tx = w3.eth.get_transaction(w3.toHex(tx_hash))
