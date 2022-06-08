@@ -108,12 +108,16 @@ def check_for_wallet_transaction(block):
 
     # if block and block['transactions']:
     for tx_hash in block['transactions']:
+        if Transaction.objects.filter(tx_hash=w3.toHex(tx_hash)).exists():
+            continue
         tx = w3.eth.get_transaction(w3.toHex(tx_hash))
         tx_data = w3.eth.get_transaction_receipt(w3.toHex(tx_hash))
-        number_of_confirmations = w3.eth.blockNumber - tx.blockNumber
+        # number_of_confirmations = w3.eth.blockNumber - tx.blockNumber
+        # print(number_of_confirmations)
+        # print(block['transactions'])
 
         # check if to address is contract
-        if w3.eth.getCode(tx['to']) != "0x":
+        if w3.toHex(w3.eth.get_code(tx['to'])) != '0x':
             to_address = get_token_receiver_address(tx_data['logs'])
             contract_address = tx['to']
         else:
@@ -128,6 +132,7 @@ def check_for_wallet_transaction(block):
         #     print(log['address'])
             # print(w3.eth.decode)
         to_wallet_qs = wallets.filter(erc20_address__iexact=to_address)
+
         if to_wallet_qs.exists():
             Transaction.objects.create(
                 running_balance=to_wallet_qs.first().get_balance(),
@@ -160,3 +165,20 @@ def send_erc_20_token(contract_address, abi, from_wallet, to_addr, amount):
     w3.eth.send_raw_transaction(signed_txn.rawTransaction)
 
     return w3.toHex(signed_txn.hash)
+
+
+def update_transaction_status(block):
+    from wallet.models import Transaction
+    transactions = Transaction.objects.all()
+    w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
+
+    for tx_hash in block['transactions']:
+        transactions_qs = transactions.filter(trx_hash__iexact=tx_hash)
+
+        if transactions_qs.exists():
+            tx = w3.eth.get_transaction(w3.toHex(tx_hash))
+            number_of_confirmations = w3.eth.blockNumber - tx.blockNumber
+
+            if number_of_confirmations > 4:
+                transactions_qs.first().status = Transaction.COMPLETED
+                transactions_qs.first().save()

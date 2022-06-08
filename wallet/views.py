@@ -12,7 +12,7 @@ from .models import Transaction, Coin
 from .utils import send_eth, send_erc_20_token, get_token_balance
 
 
-class CoinListView(ListView):
+class CoinListView(LoginRequiredMixin, ListView):
     model = Coin
     template_name = 'coin_list.html'
 
@@ -36,6 +36,10 @@ class SendEthView(LoginRequiredMixin, SingleObjectMixin, FormView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().post(request, *args, **kwargs)
 
     def get_form_kwargs(self):
 
@@ -70,13 +74,21 @@ class SendEthView(LoginRequiredMixin, SingleObjectMixin, FormView):
 
         if not coin_obj.is_token:
             running_balance = user_wallet.get_balance()
-            tx_hash = send_eth(user_wallet, to_addr, amount)
+            try:
+                tx_hash = send_eth(user_wallet, to_addr, amount)
+            except ValueError as e:
+                messages.error(self.request, 'Insufficient fund for gas.')
+                return self.form_invalid(form)
         else:
             running_balance = get_token_balance(user_wallet.erc20_address, coin_obj)
-            tx_hash = send_erc_20_token(
-                coin_obj.contract_address, json.dumps(coin_obj.abi),
-                user_wallet, to_addr, amount
-            )
+            try:
+                tx_hash = send_erc_20_token(
+                    coin_obj.contract_address, json.dumps(coin_obj.abi),
+                    user_wallet, to_addr, amount
+                )
+            except ValueError as e:
+                messages.error(self.request, 'Insufficient fund for gas.')
+                return self.form_invalid(form)
 
         Transaction.objects.create(
             wallet=user_wallet,
@@ -90,3 +102,11 @@ class SendEthView(LoginRequiredMixin, SingleObjectMixin, FormView):
         )
 
         return res
+
+
+class MyTransactionView(LoginRequiredMixin, ListView):
+    model = Transaction
+    template_name = 'my_transactions.html'
+
+    def get_queryset(self):
+        return Transaction.objects.filter(wallet=self.request.user.wallet)

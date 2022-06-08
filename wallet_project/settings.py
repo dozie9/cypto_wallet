@@ -11,16 +11,10 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 from pathlib import Path
-import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-env = environ.Env()
-READ_DOT_ENV_FILE = env.bool("DJANGO_READ_DOT_ENV_FILE", default=True)
-if READ_DOT_ENV_FILE:
-    # OS environment variables take precedence over variables from .env
-    env.read_env(str(BASE_DIR / ".env"))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
@@ -136,5 +130,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MNEMONIC = 'few spread dry warrior home baby give affair drink east advance drill final trip country quiz two rival hope version reject unlock monster magic'
 
 
-WEB3_URL = env("WEB3_URL", default="http://127.0.0.1:8545")
-WEB3_WEBSOCKET_URL = env("WEB3_WEBSOCKET_URL", default="ws://127.0.0.1:8545")
+WEB3_URL = "http://127.0.0.1:8545"
+WEB3_WEBSOCKET_URL = "ws://127.0.0.1:8545"

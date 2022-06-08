@@ -11,6 +11,8 @@
     {% endif %}
 
     <form method="post">
+    <p>user: {{ user.username }}</p>
+    <p>address: {{ user.wallet.erc20_address }}</p>
     <p>Current balance: {{ balance }} <br></p>
         {% csrf_token %}
         {{ form.as_p }}
