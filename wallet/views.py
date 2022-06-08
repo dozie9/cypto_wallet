@@ -8,7 +8,7 @@ from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.edit import FormMixin
 
 from .forms import SendEthForm
-from .models import Transaction, Coin
+from .models import Transaction, Coin, Wallet
 from .utils import send_eth, send_erc_20_token, get_token_balance
 
 
@@ -96,6 +96,18 @@ class SendEthView(LoginRequiredMixin, SingleObjectMixin, FormView):
             trx_hash=tx_hash,
             transaction_type=Transaction.WITHDRAW
         )
+
+        to_wallet_qs = Wallet.objects.filter(erc20_address__iexact=to_addr)
+
+        # Checks if wallet is an internal wallet
+
+        if to_wallet_qs.exists():
+            Transaction.objects.create(
+                wallet=to_wallet_qs.first(),
+                running_balance=to_wallet_qs.first().get_balance() if not coin_obj.is_token else get_token_balance(to_wallet_qs.first().erc20_address, coin_obj),
+                trx_hash=tx_hash,
+                transaction_type=Transaction.DEPOSIT
+            )
 
         messages.success(
             self.request, f'Transaction has successfully been sent to the blockchain. The Transaction hash is {tx_hash}'

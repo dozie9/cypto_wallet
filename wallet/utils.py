@@ -108,7 +108,7 @@ def check_for_wallet_transaction(block):
 
     # if block and block['transactions']:
     for tx_hash in block['transactions']:
-        if Transaction.objects.filter(tx_hash=w3.toHex(tx_hash)).exists():
+        if Transaction.objects.filter(trx_hash=w3.toHex(tx_hash)).exists():
             continue
         tx = w3.eth.get_transaction(w3.toHex(tx_hash))
         tx_data = w3.eth.get_transaction_receipt(w3.toHex(tx_hash))

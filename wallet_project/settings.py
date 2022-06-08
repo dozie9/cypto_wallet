@@ -127,8 +127,11 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# environment variables
+
+# wallet mnemonic to generate addresses
 MNEMONIC = 'few spread dry warrior home baby give affair drink east advance drill final trip country quiz two rival hope version reject unlock monster magic'
 
-
+# Blockchain endpoints
 WEB3_URL = "http://127.0.0.1:8545"
 WEB3_WEBSOCKET_URL = "ws://127.0.0.1:8545"
