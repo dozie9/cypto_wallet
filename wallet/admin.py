@@ -15,4 +15,4 @@ class WalletAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ['wallet', 'status', 'transaction_type']
+    list_display = ['wallet', 'status', 'transaction_type', 'created_at']

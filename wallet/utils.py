@@ -1,4 +1,6 @@
+import binascii
 import json
+import traceback
 
 from django.conf import settings
 from py_crypto_hd_wallet import HdWalletBipFactory, HdWalletSaver, HdWalletBip44Coins, HdWalletBipWordsNum, \
@@ -7,7 +9,7 @@ from py_crypto_hd_wallet import HdWalletBipFactory, HdWalletSaver, HdWalletBip44
 # Create a BIP-0044 Bitcoin wallet factory
 # hd_wallet_fact = HdWalletBipFactory(HdWalletBip44Coins.BITCOIN)
 # Create a BIP-0049 Litecoin wallet factory
-from web3 import Web3
+from web3 import Web3, exceptions as w3_exceptions
 
 
 # mnemonic = settings.MNEMONIC
@@ -15,7 +17,10 @@ from web3 import Web3
 
 def wallet_generator(addr_num=1):
     hd_wallet_fact = HdWalletBipFactory(HdWalletBip44Coins.ETHEREUM)
-    hd_wallet = hd_wallet_fact.CreateFromMnemonic("my_wallet_name", settings.MNEMONIC)
+
+    # hd_wallet = hd_wallet_fact.CreateFromMnemonic("my_wallet_name", settings.MNEMONIC)
+    # priv_key = binascii.unhexlify(bytes(settings.MASTER_PRIVATE_KEY, 'utf-8'))
+    hd_wallet = hd_wallet_fact.CreateFromExtendedKey("my_wallet_name", settings.MASTER_PRIVATE_KEY)
     hd_wallet.Generate(addr_num=addr_num)
     return hd_wallet
 
@@ -101,27 +106,42 @@ def get_token_amount(logs):
             return decode_parameter_amount(bytes.fromhex(log['data'][2:]))[0]
 
 
-def check_for_wallet_transaction(block):
+def check_for_wallet_transaction(block, reorg):
     from wallet.models import Wallet, Transaction
     wallets = Wallet.objects.all()
     w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
-    # if block and block['transactions']:
+    # delete transaction if reorganisation
+    if reorg:
+        Transaction.objects.filter(block_number=block['number']).delete()
+
     for tx_hash in block['transactions']:
-        if Transaction.objects.filter(trx_hash=w3.toHex(tx_hash)).exists():
-            continue
+
         tx = w3.eth.get_transaction(w3.toHex(tx_hash))
-        tx_data = w3.eth.get_transaction_receipt(w3.toHex(tx_hash))
+
+        if tx['to'] is None:
+            continue
+
+        try:
+            tx_data = w3.eth.get_transaction_receipt(w3.toHex(tx_hash))
+        except w3_exceptions.TransactionNotFound:
+            continue
         # number_of_confirmations = w3.eth.blockNumber - tx.blockNumber
         # print(number_of_confirmations)
         # print(block['transactions'])
 
         # check if to address is contract
         if w3.toHex(w3.eth.get_code(tx['to'])) != '0x':
+
             to_address = get_token_receiver_address(tx_data['logs'])
             contract_address = tx['to']
+
+            if to_address is None:
+                continue
+            # print(to_address, 'contract')
         else:
             to_address = tx['to']
+            # print(to_address, 'norm')
 
         # print(tx)
         # print(tx_data['logs'])
@@ -138,7 +158,8 @@ def check_for_wallet_transaction(block):
                 running_balance=to_wallet_qs.first().get_balance(),
                 wallet=to_wallet_qs.first(),
                 trx_hash=w3.toHex(tx_hash),
-                transaction_type=Transaction.DEPOSIT
+                transaction_type=Transaction.DEPOSIT,
+                block_number=block['number']
             )
 
 
@@ -167,18 +188,22 @@ def send_erc_20_token(contract_address, abi, from_wallet, to_addr, amount):
     return w3.toHex(signed_txn.hash)
 
 
-def update_transaction_status(block):
+def update_transaction_status():
     from wallet.models import Transaction
-    transactions = Transaction.objects.all()
+    # transactions = Transaction.objects.all()
     w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
-    for tx_hash in block['transactions']:
-        transactions_qs = transactions.filter(trx_hash__iexact=tx_hash, status=Transaction.PENDING)
+    # for tx_hash in block['transactions']:
+    transactions_qs = Transaction.objects.filter(status=Transaction.PENDING)
+    if not transactions_qs.exists():
+        return None
 
-        if transactions_qs.exists():
-            tx = w3.eth.get_transaction(w3.toHex(tx_hash))
+    for transaction in transactions_qs:
+        try:
+            tx = w3.eth.get_transaction(transaction.trx_hash)
             number_of_confirmations = w3.eth.blockNumber - tx.blockNumber
-
             if number_of_confirmations > 4:
-                transactions_qs.first().status = Transaction.COMPLETED
-                transactions_qs.first().save()
+                transaction.status = Transaction.COMPLETED
+                transaction.save()
+        except w3_exceptions.TransactionNotFound:
+            pass

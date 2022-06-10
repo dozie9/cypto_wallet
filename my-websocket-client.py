@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import traceback
 
 import websocket
 import _thread
@@ -22,19 +23,22 @@ from wallet.models import Wallet
 
 w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
+prev_block = 0
 
 def on_message(ws, message):
+    global prev_block
     message_dict = json.loads(message)
-    # print(message_dict)
+
     try:
         new_head_hash = message_dict['params']['result']['hash']
         block = w3.eth.get_block(new_head_hash)
-        # print(block)
-        check_for_wallet_transaction(block)
-        update_transaction_status(block)
+
+        check_for_wallet_transaction(block, reorg=prev_block==block['number'])
+        update_transaction_status()
+
+        prev_block = block['number']
     except KeyError as e:
-        print(e)
-    # print(message_dict)
+        traceback.print_exc()
 
 
 def on_error(ws, error):
@@ -48,6 +52,7 @@ def on_close(ws, close_status_code, close_msg):
 def on_open(ws):
     print("Opened connection")
     ws.send(json.dumps({"id": 1, "method": "eth_subscribe", "params": ["newHeads"]}))
+    # ws.send(json.dumps({"id": 1, "method": "eth_subscribe", "params": ["newPendingTransactions"]}))
 
 
 if __name__ == "__main__":

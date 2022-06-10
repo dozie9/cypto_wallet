@@ -70,3 +70,7 @@ class Transaction(models.Model):
     transaction_type = models.CharField(max_length=250, choices=TRANSACTION_TYPES)
     description = models.TextField(blank=True, null=True)
     trx_hash = models.TextField(_("Transaction hash"), null=True)
+    block_number = models.PositiveBigIntegerField(null=True)
+
+    class Meta:
+        ordering = ['-created_at']

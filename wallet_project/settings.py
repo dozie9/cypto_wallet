@@ -130,8 +130,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # environment variables
 
 # wallet mnemonic to generate addresses
-MNEMONIC = 'few spread dry warrior home baby give affair drink east advance drill final trip country quiz two rival hope version reject unlock monster magic'
+# MNEMONIC = 'few spread dry warrior home baby give affair drink east advance drill final trip country quiz two rival hope version reject unlock monster magic'
+MASTER_PRIVATE_KEY = 'xpub6CNEuurhWEMy3CY97tmEkiYGrLx9S8SCaz6M2aKWujVZwqWoLUFTt5LYVwZeFTF1cwaeSRVikmjSeb7ZH88x4igTFZj5tYewgFqWQfwm3PP'
 
 # Blockchain endpoints
-WEB3_URL = "http://127.0.0.1:8545"
-WEB3_WEBSOCKET_URL = "ws://127.0.0.1:8545"
+WEB3_URL = "https://kovan.infura.io/v3/7ce799d7b0f64cbebbb403ee96f8f959"
+WEB3_WEBSOCKET_URL = "wss://kovan.infura.io/ws/v3/7ce799d7b0f64cbebbb403ee96f8f959"
+
