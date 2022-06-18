@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from wallet.models import Wallet, Transaction, Coin
+from wallet.models import Wallet, WalletBalance, Transaction, Coin
 
 
 @admin.register(Coin)
@@ -13,6 +13,12 @@ class WalletAdmin(admin.ModelAdmin):
     list_display = ['user']
 
 
+@admin.register(WalletBalance)
+class WalletBalanceAdmin(admin.ModelAdmin):
+    list_display = ['wallet', 'coin', 'balance']
+
+
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
     list_display = ['wallet', 'status', 'transaction_type', 'created_at']
+    list_filter = ['status']

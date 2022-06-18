@@ -42,6 +42,29 @@ class Wallet(models.Model):
 
         return send_eth(self, to_wallet, amount)
 
+    def get_coin_balance(self, code):
+        wallet_bal_qs = self.walletbalance_set.filter(coin__code=code)
+        if not wallet_bal_qs.exists():
+            return 0
+        return wallet_bal_qs.first().balance
+
+    def get_wallet_balance_obj(self, code):
+        return self.walletbalance_set.filter(coin__code=code).first()
+
+
+class WalletBalance(models.Model):
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE)
+    coin = models.ForeignKey(Coin, on_delete=models.CASCADE)
+    balance = models.DecimalField(max_digits=36, decimal_places=18, default=0)
+
+    class Meta:
+        unique_together = [
+            ['wallet', 'coin']
+        ]
+
+    def __str__(self):
+        return f'{self.wallet.user.username} | {self.coin.code}'
+
 
 class Transaction(models.Model):
     DEPOSIT = 'deposit'
@@ -63,7 +86,7 @@ class Transaction(models.Model):
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE)
 
     # The value of the wallet at the time of this transaction.
-    running_balance = models.DecimalField(decimal_places=18, max_digits=36, default=0)
+    running_balance = models.DecimalField(decimal_places=18, max_digits=36, null=True, blank=True)
     status = models.CharField(max_length=250, default=PENDING, choices=STATUS_CHOICES)
 
     created_at = models.DateTimeField(default=timezone.now)
@@ -71,6 +94,7 @@ class Transaction(models.Model):
     description = models.TextField(blank=True, null=True)
     trx_hash = models.TextField(_("Transaction hash"), null=True)
     block_number = models.PositiveBigIntegerField(null=True)
+    contract_address = models.TextField(blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']

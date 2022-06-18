@@ -29,13 +29,8 @@ class SendEthForm(forms.Form):
 
         coin = self.coin
 
-        if not coin.is_token:
-
-            if self.request.user.wallet.get_balance() <= data:
-                raise forms.ValidationError('Insufficient funds.')
-        else:
-            if get_token_balance(self.request.user.wallet.erc20_address, coin) <= data:
-                raise forms.ValidationError('Insufficient funds.')
+        if self.request.user.wallet.get_wallet_balance_obj(coin.code).balance < data:
+            raise forms.ValidationError('Insufficient funds.')
 
         return data
 

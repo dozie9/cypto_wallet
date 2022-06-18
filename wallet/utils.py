@@ -41,7 +41,7 @@ def get_eth_balance(addr):
 def get_token_balance(addr, coin):
     w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
-    contract = w3.eth.contract(coin.contract_address, abi=coin.abi)
+    contract = w3.eth.contract(w3.toChecksumAddress(coin.contract_address), abi=coin.abi)
     decimals = contract.functions.decimals().call()
     DECIMALS = 10 ** decimals
     raw_balance = contract.functions.balanceOf(addr).call()
@@ -57,8 +57,8 @@ def send_eth(from_wallet, to_wallet: str, amount):
 
     tx = dict(
         nonce=nonce,
-        maxFeePerGas=base_fee_per_gas + 1,
-        maxPriorityFeePerGas=1,
+        maxFeePerGas=base_fee_per_gas + w3.toWei(1, 'gwei'),
+        maxPriorityFeePerGas=w3.toWei(1, 'gwei'),
         gas=21000,
         to=to_wallet,
         value=w3.toWei(amount, 'ether'),
@@ -74,6 +74,46 @@ def send_eth(from_wallet, to_wallet: str, amount):
     tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
 
     return w3.toHex(tx_hash)
+
+
+def get_contract_obj(contract_address):
+    from .models import Coin
+    w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
+
+    coin = Coin.objects.get(contract_address__iexact=contract_address)
+
+    contract = w3.eth.contract(w3.toChecksumAddress(contract_address), abi=coin.abi)
+    # decimals = contract.functions.decimals().call()
+    # DECIMALS = 10 ** decimals
+    # amount_with_decimal = int(amount * DECIMALS)
+    return contract
+
+
+def create_user_wallet_balance(user):
+    from .models import Coin, WalletBalance
+    for coin in Coin.objects.all():
+        WalletBalance.objects.get_or_create(
+            wallet=user.wallet,
+            coin=coin,
+        )
+
+
+def update_wallet_balances(user):
+    from .models import Coin, WalletBalance
+    for coin in Coin.objects.all():
+        try:
+            balance = WalletBalance.objects.get(
+                wallet=user.wallet,
+                coin=coin,
+            )
+            if coin.code == 'ETH':
+                balance.balance = user.wallet.get_balance()
+            else:
+                balance.balance = get_token_balance(addr=user.wallet.erc20_address, coin=coin)
+            balance.save()
+            print(user.wallet, coin)
+        except WalletBalance.DoesNotExist:
+            pass
 
 
 def decode_parameter_address(data):
@@ -116,6 +156,7 @@ def check_for_wallet_transaction(block, reorg):
         Transaction.objects.filter(block_number=block['number']).delete()
 
     for tx_hash in block['transactions']:
+        contract_address = None
 
         tx = w3.eth.get_transaction(w3.toHex(tx_hash))
 
@@ -154,42 +195,48 @@ def check_for_wallet_transaction(block, reorg):
         to_wallet_qs = wallets.filter(erc20_address__iexact=to_address)
 
         if to_wallet_qs.exists():
+            if Transaction.objects.filter(wallet=to_wallet_qs.first(), trx_hash__iexact=w3.toHex(tx_hash)).exists():
+                return None
             Transaction.objects.create(
-                running_balance=to_wallet_qs.first().get_balance(),
+                # running_balance=to_wallet_qs.first().get_balance(),
                 wallet=to_wallet_qs.first(),
                 trx_hash=w3.toHex(tx_hash),
                 transaction_type=Transaction.DEPOSIT,
-                block_number=block['number']
+                block_number=block['number'],
+                contract_address=contract_address
             )
 
 
 def send_erc_20_token(contract_address, abi, from_wallet, to_addr, amount):
     w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
-    contract = w3.eth.contract(contract_address, abi=abi)
+    contract = w3.eth.contract(w3.toChecksumAddress(contract_address), abi=abi)
     decimals = contract.functions.decimals().call()
     DECIMALS = 10 ** decimals
     amount_with_decimal = int(amount * DECIMALS)
 
     nonce = w3.eth.get_transaction_count(from_wallet.erc20_address)
 
-    base_fee_per_gas = w3.eth.get_block('latest')['baseFeePerGas']
+    latest_block = w3.eth.get_block('latest')
+    gas_limit = latest_block['gasLimit']
+    base_fee_per_gas = latest_block['baseFeePerGas']
+    tip = 1
 
     txn = contract.functions.transfer(to_addr, amount_with_decimal).buildTransaction({
         'chainId': w3.eth.chain_id,
-        'gas': 210000,
-        'maxFeePerGas': base_fee_per_gas + 1,
-        'maxPriorityFeePerGas': 1,
+        'gas': 80000,
+        'maxFeePerGas': base_fee_per_gas + w3.toWei(tip, 'gwei'),
+        'maxPriorityFeePerGas': w3.toWei(tip, 'gwei'),
         'nonce': nonce
     }) # .transact({'from': to_addr})
     signed_txn = w3.eth.account.sign_transaction(txn, private_key=from_wallet.get_private_key())
     w3.eth.send_raw_transaction(signed_txn.rawTransaction)
 
-    return w3.toHex(signed_txn.hash)
+    return w3.toHex(w3.keccak(signed_txn.rawTransaction))
 
 
 def update_transaction_status():
-    from wallet.models import Transaction
+    from wallet.models import Transaction, Coin
     # transactions = Transaction.objects.all()
     w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
@@ -201,9 +248,30 @@ def update_transaction_status():
     for transaction in transactions_qs:
         try:
             tx = w3.eth.get_transaction(transaction.trx_hash)
+            print(tx)
             number_of_confirmations = w3.eth.blockNumber - tx.blockNumber
             if number_of_confirmations > 4:
                 transaction.status = Transaction.COMPLETED
+
+                # Check if transaction for a token or eth
+                if transaction.contract_address:
+                    if not Coin.objects.filter(contract_address__iexact=transaction.contract_address).exists():
+                        return None
+                    contract = get_contract_obj(transaction.contract_address)
+                    decimals = contract.functions.decimals().call()
+                    symbol = contract.functions.symbol().call()
+                    DECIMALS = 10 ** decimals
+                    raw_balance = contract.functions.balanceOf(transaction.wallet.erc20_address).call()
+                    wallet_balance = transaction.wallet.get_wallet_balance_obj(symbol)
+                    wallet_balance.balance = raw_balance / DECIMALS
+                    wallet_balance.save()
+                else:
+                    wallet_balance = transaction.wallet.get_wallet_balance_obj('ETH')
+                    wallet_balance.balance = transaction.wallet.get_balance()
+                    wallet_balance.save()
+
                 transaction.save()
         except w3_exceptions.TransactionNotFound:
             pass
+        except Exception:
+            traceback.print_exc()

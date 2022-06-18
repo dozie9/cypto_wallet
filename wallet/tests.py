@@ -142,3 +142,16 @@ from django.test import TestCase
             'ex_priv': 'xprvA2UX6vuizhsVtcVJPdWxYHDcm3zaQZ2o4vQ9BFN5NmuKfdp4cmsKvdsG6oq27MJ54raecxonKhhoB3cFXTekpcQpceGL9j8SamFKSgPCYgr',
             'raw_priv': 'f44f31e8eca612bdd2440faaddf7e2d8547fe22f8295f20b4b48629164ce8b5a',
             'address': '0xdE1A2CbbB38C5bb82CDd9eBDE2603c39bddb2798'}}}
+
+{
+    'address_0': {
+        'ex_pub': 'xpub6FTsWSScq5RnwzSwhhW6SWhLGvv2kWsF8qL2sV2vD5osp92Y2jChimK3v4iNnUDLE1jdoSQ5ntNmunNa3AapDhQkNEbvnUXuSAQ1LMdicEe',
+        'raw_compr_pub': '03a92ab1c8095b4fa0f104d4419410ad1cb0fb4f4dbf02b80eaccc554da7d7decc',
+        'raw_uncompr_pub': '04a92ab1c8095b4fa0f104d4419410ad1cb0fb4f4dbf02b80eaccc554da7d7decc55f41be12b3f48327dd4cfdbfb3e8cd1a40bed6ba17e7bd7285e5fa012abf6dd',
+        'address': '0x51e7FD1aBf6baa5a7fc0c6d88CF25e7bb3E27D5B'},
+    'address_1': {
+        'ex_pub': 'xpub6FTsWSScq5Ro27ZSkGY4YJkHf4hvE4Kqm7FtKXAmN7y2DSHu9f8BUEWWxs3zC1QPmm4CorrWcjtvqX4i3BrwGdKG3rXMWimuqhvk7u2Qn6z',
+        'raw_compr_pub': '02c045c1b84f8b5e49c8e03d7714c9dfa82e50fdcbc17ba9b710ac6dbc51ed21ca',
+        'raw_uncompr_pub': '04c045c1b84f8b5e49c8e03d7714c9dfa82e50fdcbc17ba9b710ac6dbc51ed21ca21d0f4f1b8058c93893098f1f6b65fff9e1423029a648ec3dc68287eb347260e',
+        'address': '0x8ed7Be43066cFD7D40478773332FcB4Edde21297'}
+}

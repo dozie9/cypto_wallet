@@ -19,11 +19,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wallet_project.settings")
 
 django.setup()
 from django.conf import settings
-from wallet.models import Wallet
 
 w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
 prev_block = 0
+
 
 def on_message(ws, message):
     global prev_block
