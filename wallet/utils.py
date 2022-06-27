@@ -153,7 +153,9 @@ def check_for_wallet_transaction(block, reorg):
 
     # delete transaction if reorganisation
     if reorg:
-        Transaction.objects.filter(block_number=block['number']).delete()
+        reorg_trx_qs = Transaction.objects.filter(block_number=block['number'])
+        if reorg_trx_qs.exists():
+            Transaction.objects.filter(block_number=block['number']).delete()
 
     for tx_hash in block['transactions']:
         contract_address = None
