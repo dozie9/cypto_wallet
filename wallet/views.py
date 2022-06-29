@@ -11,8 +11,8 @@ from django.views.generic.edit import FormMixin
 from web3 import Web3
 
 from .forms import SendEthForm
-from .models import Transaction, Coin, Wallet
-from .utils import send_eth, send_erc_20_token, get_token_balance
+from .models import Transaction, Coin, Wallet, WalletBalance
+from .utils import send_eth, send_erc_20_token, get_token_balance, gen_trxn_id
 
 w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
 
@@ -78,59 +78,41 @@ class SendEthView(LoginRequiredMixin, SingleObjectMixin, FormView):
 
         to_addr = form.cleaned_data['to_address']
         amount = form.cleaned_data['amount']
+        trx_type = form.cleaned_data['transaction_type']
         coin_obj = self.get_object()
         wallet_balance = user_wallet.get_wallet_balance_obj(coin_obj.code)
-        running_balance = wallet_balance.balance
-        contract_address = None
 
-        if not coin_obj.is_token:
+        try:
 
-            try:
-                tx_hash = send_eth(user_wallet, to_addr, amount)
-            except ValueError as e:
-
-                messages.error(self.request, 'Insufficient fund for gas.')
-                return self.form_invalid(form)
-        else:
-            # running_balance = get_token_balance(user_wallet.erc20_address, coin_obj)
-            contract_address = coin_obj.contract_address
-            try:
-                tx_hash = send_erc_20_token(
-                    coin_obj.contract_address, json.dumps(coin_obj.abi),
-                    user_wallet, to_addr, amount
+            if trx_type == Transaction.TRANSFER:
+                receiver = WalletBalance.objects.filter(wallet__erc20address__address__iexact=to_addr, coin=coin_obj).first()
+                transaction = wallet_balance.transfer(
+                    wallet_balance=receiver,
+                    value=amount,
+                    transaction_type='transfer',
+                    description=None,
+                    trx_hash=gen_trxn_id(),
+                    create_transaction=True,
+                    is_internal=True
                 )
-            except ValueError as e:
 
-                # print(e, w3.eth.get_block('latest')['baseFeePerGas'], '.....')
-                messages.error(self.request, 'Insufficient fund for gas.')
-                return self.form_invalid(form)
+                messages.success(
+                    self.request,
+                    f'Transaction has successful. '
+                )
+            else:
+                transaction = wallet_balance.external_transfer(
+                    value=amount, to_address=to_addr
+                )
 
-        Transaction.objects.create(
-            wallet=user_wallet,
-            running_balance=running_balance,
-            trx_hash=tx_hash,
-            transaction_type=Transaction.WITHDRAW,
-            contract_address=contract_address
-        )
-
-        to_wallet_qs = Wallet.objects.filter(erc20_address__iexact=to_addr)
-
-        # Checks if wallet is an internal wallet
-
-        if to_wallet_qs.exists():
-            Transaction.objects.create(
-                wallet=to_wallet_qs.first(),
-                running_balance=to_wallet_qs.first().get_balance() if not coin_obj.is_token else get_token_balance(to_wallet_qs.first().erc20_address, coin_obj),
-                trx_hash=tx_hash,
-                transaction_type=Transaction.DEPOSIT,
-                contract_address=contract_address
-            )
-
-        messages.success(
-            self.request,
-            f'Transaction has successfully been sent to the blockchain. '
-            f'The Transaction hash is <a href="https://kovan.etherscan.io/tx/{tx_hash}">{tx_hash}</a>'
-        )
+                messages.success(
+                    self.request,
+                    f'Transaction has successfully been sent to the blockchain. '
+                    f'The Transaction hash is <a target="_blank" href="https://kovan.etherscan.io/tx/{transaction.trx_hash}">{transaction.trx_hash}</a>'
+                )
+        except ValueError as e:
+            messages.error(self.request, 'Insufficient fund for gas.')
+            return self.form_invalid(form)
 
         return res
 

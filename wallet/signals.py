@@ -3,7 +3,7 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch.dispatcher import receiver
 from py_crypto_hd_wallet import HdWalletBipKeyTypes
 
-from .models import Wallet, Coin, WalletBalance, Transaction
+from .models import Wallet, Coin, WalletBalance, Transaction, Erc20Address
 from .utils import gen_user_addr, get_contract_obj
 
 User = get_user_model()
@@ -23,20 +23,23 @@ def user_post_save(sender, instance: User, created, **kwargs):
             )
 
         # Generate erc20 address for user
-        addr = gen_user_addr(user_id=instance.id)
-        wallet.erc20_address = addr.GetKey(HdWalletBipKeyTypes.ADDRESS)
-        wallet.save()
+        erc_20_addr_obj = Erc20Address.objects.create(wallet=wallet, is_default=True)
+
+        addr = gen_user_addr(address_id=erc_20_addr_obj.id)
+        erc_20_addr_obj.address = addr.GetKey(HdWalletBipKeyTypes.ADDRESS)
+
+        erc_20_addr_obj.save()
 
 
-@receiver(post_save, sender=Transaction)
-def transaction_post_save(sender, instance: Transaction, created, **kwargs):
-    if created:
-        if instance.contract_address:
-            if not Coin.objects.filter(contract_address__iexact=instance.contract_address).exists():
-                return None
-            contract = get_contract_obj(instance.contract_address)
-            symbol = contract.functions.symbol().call()
-        else:
-            symbol = 'ETH'
-        instance.running_balance = instance.wallet.get_coin_balance(code=symbol)
-        instance.save()
+# @receiver(post_save, sender=Transaction)
+# def transaction_post_save(sender, instance: Transaction, created, **kwargs):
+#     if created:
+#         if instance.contract_address:
+#             if not Coin.objects.filter(contract_address__iexact=instance.contract_address).exists():
+#                 return None
+#             contract = get_contract_obj(instance.contract_address)
+#             symbol = contract.functions.symbol().call()
+#         else:
+#             symbol = 'ETH'
+#         instance.running_balance = instance.wallet.get_coin_balance(code=symbol)
+#         instance.save()

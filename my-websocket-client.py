@@ -10,7 +10,7 @@ import rel
 import django
 from web3 import Web3
 
-from wallet.utils import check_for_wallet_transaction, update_transaction_status
+from wallet.utils import check_for_ether_transactions, update_transaction_status, check_for_token_transactions
 
 sys.path.append(
     os.path.join(os.path.dirname(__file__), 'wallet_project')
@@ -27,14 +27,16 @@ prev_block = 0
 
 def on_message(ws, message):
     global prev_block
+
     message_dict = json.loads(message)
 
     try:
-        new_head_hash = message_dict['params']['result']['hash']
-        block = w3.eth.get_block(new_head_hash)
+        b_number = message_dict['params']['result']['number']
+        block = w3.eth.get_block(b_number, full_transactions=True)
 
-        check_for_wallet_transaction(block, reorg=prev_block==block['number'])
-        update_transaction_status()
+        check_for_ether_transactions(block, reorg=prev_block==block['number'])
+        check_for_token_transactions(block, reorg=prev_block==block['number'])
+        update_transaction_status(block)
 
         prev_block = block['number']
     except KeyError as e:
@@ -56,7 +58,7 @@ def on_open(ws):
 
 
 if __name__ == "__main__":
-    websocket.enableTrace(True)
+    websocket.enableTrace(False)
     ws = websocket.WebSocketApp(settings.WEB3_WEBSOCKET_URL,
                               on_open=on_open,
                               on_message=on_message,
