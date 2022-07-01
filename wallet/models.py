@@ -1,7 +1,7 @@
 import json
 
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from py_crypto_hd_wallet import HdWalletBipKeyTypes
@@ -83,6 +83,7 @@ class WalletBalance(models.Model):
     def __str__(self):
         return f'{self.wallet.user.username} | {self.coin.code}'
 
+    @transaction.atomic
     def deposit(self, value, transaction_type='deposit', description=None, trx_hash=None, create_transaction=True, is_internal=True):
         """Deposits a value to the wallet.
         Also creates a new transaction with the deposit
@@ -105,6 +106,7 @@ class WalletBalance(models.Model):
         self.balance += value
         self.save()
 
+    @transaction.atomic
     def withdraw(self, value, transaction_type='withdraw', description=None, trx_hash=None, status='pending', is_internal=False):
         """Withdraw's a value from the wallet.
         Also creates a new transaction with the withdraw
@@ -135,15 +137,17 @@ class WalletBalance(models.Model):
         self.save()
         return trx
 
+    @transaction.atomic
     def transfer(self, wallet_balance, value, transaction_type='transfer',
-                 description=None, trx_hash=None, create_transaction=False, is_internal=True):
+                 description=None, trx_hash=None, create_transaction=False, is_internal=True, status='complete'):
         """Transfers an value to another wallet.
         Uses `deposit` and `withdraw` internally.
         """
-        trx = self.withdraw(value, transaction_type, description, trx_hash)
+        trx = self.withdraw(value, transaction_type, description, trx_hash, status='complete')
         wallet_balance.deposit(value, transaction_type, description, trx_hash, create_transaction=create_transaction, is_internal=is_internal)
         return trx
 
+    @transaction.atomic
     def external_transfer(self, value, to_address, transaction_type='withdraw', description=None, trx_hash=None, is_internal=False):
         withdraw_trx = self.withdraw(value, transaction_type, description, trx_hash, is_internal=False)
         if self.coin.is_token:
@@ -179,6 +183,12 @@ class Transaction(models.Model):
         (PENDING, PENDING.title()),
         (COMPLETED, COMPLETED.title()),
     )
+    NEW_HEADS = 'newHeads'
+    LOGS = 'logs'
+    SUBSCRIPTION_CHOICES = (
+        (NEW_HEADS, NEW_HEADS),
+        (LOGS, LOGS)
+    )
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE)
 
@@ -193,6 +203,7 @@ class Transaction(models.Model):
     trx_hash = models.TextField(_("Transaction hash"), null=True)
     block_number = models.PositiveBigIntegerField(null=True, blank=True)
     contract_address = models.TextField(blank=True, null=True)
+    subscription_type = models.CharField(max_length=200, choices=STATUS_CHOICES, blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']

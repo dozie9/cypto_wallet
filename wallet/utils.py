@@ -195,7 +195,7 @@ def check_for_ether_transactions(block, reorg):
 
     # delete transaction if reorganisation
     if reorg:
-        reorg_trx_qs = Transaction.objects.filter(block_number=block['number'])
+        reorg_trx_qs = Transaction.objects.filter(block_number=block['number'], subscription_type=Transaction.NEW_HEADS)
         if reorg_trx_qs.exists():
             Transaction.objects.filter(block_number=block['number']).delete()
 
@@ -220,7 +220,8 @@ def check_for_ether_transactions(block, reorg):
                 trx_hash=w3.toHex(trx['hash']),
                 transaction_type=Transaction.DEPOSIT,
                 block_number=block['number'],
-                is_internal=False
+                is_internal=False,
+                subscription_type=Transaction.NEW_HEADS
             )
 
 
@@ -270,6 +271,43 @@ def check_for_token_transactions(block, reorg):
             )
     except Exception:
         traceback.print_exc()
+
+
+def on_token_transaction(log, reorg):
+    from wallet.models import Erc20Address, Transaction, WalletBalance
+
+    block_number = int(log['blockNumber'], 16)
+
+    if reorg:
+        reorg_trx_qs = Transaction.objects.filter(block_number=block_number, subscription_type=Transaction.LOGS)
+        if reorg_trx_qs.exists():
+            reorg_trx_qs.delete()
+
+    to_address = decode_parameter_address(bytes.fromhex(log['topics'][2][2:]))[0]
+
+    address_qs = Erc20Address.objects.filter(address__iexact=to_address)
+
+    if address_qs.exists():
+        wallet_ballance = WalletBalance.objects.filter(
+            coin__contract_address__iexact=log['address'],
+            wallet=address_qs.first().wallet
+        ).first()
+
+        raw_amount = decode_parameter_amount(bytes.fromhex(log['data'][2:]))[0]
+        DECIMAL, symbol = get_token_decimal_and_symbol(log['address'])
+
+        amount = Decimal(raw_amount / DECIMAL)
+
+        Transaction.objects.create(
+            running_balance=wallet_ballance.balance + amount,
+            wallet=wallet_ballance.wallet,
+            contract_address=wallet_ballance.coin.contract_address,
+            is_internal=False,
+            trx_hash=log['transactionHash'],
+            transaction_type=Transaction.DEPOSIT,
+            block_number=int(log['blockNumber'], 16),
+            subscription_type=Transaction.LOGS
+        )
 
 
 def send_erc_20_token(contract_address, abi, from_wallet, to_addr, amount):
