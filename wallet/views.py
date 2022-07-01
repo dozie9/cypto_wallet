@@ -11,7 +11,7 @@ from django.views.generic.edit import FormMixin
 from web3 import Web3
 
 from .forms import SendEthForm
-from .models import Transaction, Coin, Wallet, WalletBalance
+from .models import Transaction, Coin, Wallet, WalletBalance, Erc20Address
 from .utils import send_eth, send_erc_20_token, get_token_balance, gen_trxn_id
 
 w3 = Web3(Web3.HTTPProvider(settings.WEB3_URL))
@@ -78,13 +78,13 @@ class SendEthView(LoginRequiredMixin, SingleObjectMixin, FormView):
 
         to_addr = form.cleaned_data['to_address']
         amount = form.cleaned_data['amount']
-        trx_type = form.cleaned_data['transaction_type']
+        # trx_type = form.cleaned_data['transaction_type']
         coin_obj = self.get_object()
         wallet_balance = user_wallet.get_wallet_balance_obj(coin_obj.code)
 
         try:
 
-            if trx_type == Transaction.TRANSFER:
+            if Erc20Address.objects.filter(address__iexact=to_addr).exists():
                 receiver = WalletBalance.objects.filter(wallet__erc20address__address__iexact=to_addr, coin=coin_obj).first()
                 transaction = wallet_balance.transfer(
                     wallet_balance=receiver,
@@ -93,7 +93,8 @@ class SendEthView(LoginRequiredMixin, SingleObjectMixin, FormView):
                     description=None,
                     trx_hash=gen_trxn_id(),
                     create_transaction=True,
-                    is_internal=True
+                    is_internal=True,
+                    status='complete'
                 )
 
                 messages.success(

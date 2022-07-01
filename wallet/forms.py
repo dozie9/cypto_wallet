@@ -10,12 +10,12 @@ class SendEthForm(forms.Form):
     # coin = forms.ModelChoiceField(queryset=Coin.objects.all())
     to_address = forms.CharField()
     amount = forms.DecimalField(max_digits=36, decimal_places=18)
-    transaction_type = forms.ChoiceField(
-        choices=(
-            (Transaction.TRANSFER, Transaction.TRANSFER.title()),
-            (Transaction.WITHDRAW, Transaction.WITHDRAW.title()),
-        )
-    )
+    # transaction_type = forms.ChoiceField(
+    #     choices=(
+    #         (Transaction.TRANSFER, Transaction.TRANSFER.title()),
+    #         (Transaction.WITHDRAW, Transaction.WITHDRAW.title()),
+    #     )
+    # )
 
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop('request', None)
@@ -45,12 +45,12 @@ class SendEthForm(forms.Form):
 
         return data
 
-    def clean(self):
-        cleaned_data = super().clean()
-        transaction_type = cleaned_data['transaction_type']
-        to_address = cleaned_data['to_address']
-
-        if transaction_type == Transaction.TRANSFER and not Erc20Address.objects.filter(address__iexact=to_address).exists():
-            raise forms.ValidationError('You can not transfer to this wallet, select withdraw instead.')
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     transaction_type = cleaned_data['transaction_type']
+    #     to_address = cleaned_data['to_address']
+    #
+    #     if transaction_type == Transaction.TRANSFER and not Erc20Address.objects.filter(address__iexact=to_address).exists():
+    #         raise forms.ValidationError('You can not transfer to this wallet, select withdraw instead.')
 
 
